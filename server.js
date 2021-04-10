@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const passport = require("passport");
-const passportJWT = require("passport-jwt");
+const { ExtractJwt, Strategy } = require("passport-jwt");
 const dotenv = require("dotenv");
 
 dotenv.config();
@@ -17,7 +17,43 @@ app.use(express.json());
 app.use(cors());
 
 /* TODO Add Your Routes Here */
+app.use(passport.initialize());
+passport.use(
+  new Strategy(
+    {
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      secretOrKey: process.env.JWT_SECRET,
+    },
+    async function verify(payload, done) {
+      if (!payload) {
+        return done(null, false);
+      }
+      let user;
+      try {
+        user = await userService.byId(payload._id);
+      } catch (err) {
+        console.log(err);
+        return done(null, false);
+      }
+      if (!user) {
+        return done(null, false);
+      }
+      done(null, user);
+    }
+  )
+);
 
+// create token
+function createToken(id, username) {
+  const payload = {
+    _id: id,
+    userName: username,
+  };
+  const secret = process.env.JWT_SECRET;
+  const options = { expiresIn: "3d" };
+
+  return jwt.sign(payload, secret, options);
+}
 app.post("api/user/register", (req, res) => {
   userService
     .registerUser(req.body)
@@ -33,14 +69,10 @@ app.post("/api/user/login", (req, res) => {
   userService
     .checkUser(req.body)
     .then((user) => {
-      let tokenPayload = {
-        _id: user._id,
-        userName: user.userName,
-      };
-
-      let token = jwt.sign(tokenPayload, process.env.JWT_SECRET);
-
-      res.json({ message: "login successful", token: token });
+      res.json({
+        message: "login successful",
+        token: createToken(user._id, user.userName),
+      });
     })
     .catch((err) => {
       res.status(422).json({ message: err });
@@ -82,7 +114,7 @@ app.delete(
   passport.authenticate("jwt", { session: false }),
   (req, res) => {
     userService
-      .removeFavourite(req.user._id,  req.params.id)
+      .removeFavourite(req.user._id, req.params.id)
       .then((data) => {
         res.json(data);
       })
