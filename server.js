@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const passport = require("passport");
-const { ExtractJwt, Strategy } = require("passport-jwt");
+const passportJWT = require("passport-jwt");
 const dotenv = require("dotenv");
 
 dotenv.config();
@@ -12,47 +12,32 @@ const userService = require("./user-service.js");
 const app = express();
 
 const HTTP_PORT = process.env.PORT || 8080;
+var ExtractJwt = passportJWT.ExtractJwt;
+var JwtStrategy = passportJWT.Strategy;
 
+var jwtOptions = {};
+jwtOptions.jwtFromRequest = ExtractJwt.fromAuthHeaderWithScheme("jwt");
+
+jwtOptions.secretOrKey = process.env.JWT_SECRET;
+
+var strategy = new JwtStrategy(jwtOptions, function (jwt_payload, next) {
+	console.log("payload received", jwt_payload);
+
+	if (jwt_payload) {
+		
+		next(null, { _id: jwt_payload._id, userName: jwt_payload.userName });
+	} else {
+		next(null, false);
+	}
+});
+
+passport.use(strategy);
+
+app.use(passport.initialize());
 app.use(express.json());
 app.use(cors());
 
 /* TODO Add Your Routes Here */
-app.use(passport.initialize());
-passport.use(
-  new Strategy(
-    {
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      secretOrKey: process.env.JWT_SECRET,
-    },
-    async function verify(payload, done) {
-      if (!payload) {
-        return done(null, false);
-      }
-      let user;
-      try {
-        user = await userService.byId(payload._id);
-      } catch (err) {
-        console.log(err);
-        return done(null, false);
-      }
-      if (!user) {
-        return done(null, false);
-      }
-      done(null, user);
-    }
-  )
-);
-
-function createToken(id, username) {
-  const payload = {
-    _id: id,
-    userName: username,
-  };
-  const secret = process.env.JWT_SECRET;
-  const options = { expiresIn: "3d" };
-
-  return jwt.sign(payload, secret, options);
-}
 
 app.post("api/user/register", (req, res) => {
   userService
