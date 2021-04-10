@@ -43,7 +43,6 @@ passport.use(
   )
 );
 
-// create token
 function createToken(id, username) {
   const payload = {
     _id: id,
@@ -54,6 +53,7 @@ function createToken(id, username) {
 
   return jwt.sign(payload, secret, options);
 }
+
 app.post("api/user/register", (req, res) => {
   userService
     .registerUser(req.body)
@@ -61,6 +61,7 @@ app.post("api/user/register", (req, res) => {
       res.json({ message: msg });
     })
     .catch((err) => {
+      
       res.status(422).json({ message: err });
     });
 });
@@ -127,6 +128,7 @@ app.delete(
 userService
   .connect()
   .then(() => {
+ 
     app.listen(HTTP_PORT, () => {
       console.log("API listening on: " + HTTP_PORT);
     });
